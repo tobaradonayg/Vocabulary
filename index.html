@@ -186,7 +186,6 @@ const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
    STATE (RETROCOMPATIBLE)
 ========================= */
 let lists = JSON.parse(localStorage.getItem('factory_lists')) || [];
-let myLibrary = JSON.parse(localStorage.getItem('factory_library')) || []; // legacy
 let currentTempList = [];
 let studyIndex = 0;
 
@@ -359,13 +358,26 @@ function updateLibraryUI() {
         return;
     }
 
-    lists.forEach(list => {
-        container.innerHTML += `
-        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p class="font-bold">${list.name}</p>
-            <p class="text-[10px] text-slate-400">${list.items.length} palabras</p>
-        </div>`;
-    });
+lists.forEach(list => {
+    container.innerHTML += `
+    <div class="p-3 bg-slate-50 rounded-xl border">
+        <p class="font-bold">${list.name}</p>
+        <p class="text-[10px] text-slate-400">${list.items.length} palabras</p>
+
+        <div class="flex gap-2 mt-2">
+            <button onclick="startStudy('${list.id}')"
+                class="text-xs bg-indigo-500 text-white px-3 py-1 rounded-full">
+                Estudiar
+            </button>
+
+            <button onclick="manageList('${list.id}')"
+                class="text-xs bg-slate-200 px-3 py-1 rounded-full">
+                Editar
+            </button>
+        </div>
+    </div>`;
+});
+
 }
 
 /* =========================
@@ -389,6 +401,100 @@ function loadStudyCard() {
     window.studyQueue = due;
     showStudyCard();
 }
+
+    function startStudy(listId) {
+    const list = lists.find(l => l.id === listId);
+    if (!list || !list.items.length) {
+        alert("Lista vacía");
+        return;
+    }
+
+    window.studyQueue = list.items;
+    studyIndex = 0;
+
+    showTab('learn');
+    showStudyCard();
+}
+
+    //Abrir editor de lista
+    function manageList(listId) {
+    const list = lists.find(l => l.id === listId);
+    if (!list) return;
+
+    const container = document.getElementById('section-library');
+    container.innerHTML = `
+        <h3 class="font-bold mb-2">${list.name}</h3>
+
+        <button onclick="addWord('${listId}')"
+            class="mb-3 bg-emerald-500 text-white px-4 py-2 rounded-xl">
+            ➕ Agregar palabra
+        </button>
+
+        ${list.items.map(i => `
+            <div class="p-2 border rounded-xl mb-2">
+                <b>${i.word}</b> → ${i.translation}
+                <div class="flex gap-2 mt-1">
+                    <button onclick="editWord('${listId}','${i.id}')"
+                        class="text-xs bg-slate-200 px-2 py-1 rounded">
+                        Editar
+                    </button>
+                    <button onclick="deleteWord('${listId}','${i.id}')"
+                        class="text-xs bg-rose-200 px-2 py-1 rounded">
+                        Eliminar
+                    </button>
+                </div>
+            </div>
+        `).join("")}
+    `;
+}
+
+    //Agregar palabra
+    function addWord(listId) {
+    const list = lists.find(l => l.id === listId);
+
+    const word = prompt("Palabra:");
+    const translation = prompt("Traducción:");
+    const example = prompt("Ejemplo:");
+
+    if (!word || !translation) return;
+
+    list.items.push({
+        id: crypto.randomUUID(),
+        word,
+        translation,
+        example,
+        type: "manual",
+        nextReview: today(),
+        interval: 1,
+        ease: 2.5
+    });
+
+    saveLists();
+    manageList(listId);
+}
+
+    //Editar palabra
+    function editWord(listId, wordId) {
+    const list = lists.find(l => l.id === listId);
+    const w = list.items.find(i => i.id === wordId);
+
+    w.word = prompt("Palabra:", w.word);
+    w.translation = prompt("Traducción:", w.translation);
+    w.example = prompt("Ejemplo:", w.example);
+
+    saveLists();
+    manageList(listId);
+}
+
+    //Eliminar palabra
+    function deleteWord(listId, wordId) {
+    const list = lists.find(l => l.id === listId);
+    list.items = list.items.filter(i => i.id !== wordId);
+
+    saveLists();
+    manageList(listId);
+}
+
 
 function showStudyCard() {
     const w = window.studyQueue[studyIndex];
@@ -494,53 +600,48 @@ function clearData() {
     // --- Export / Import Library ---
 
 function exportLibrary() {
-    if (myLibrary.length === 0) {
+    if (!lists.length) {
         alert("No tienes listas para descargar.");
         return;
     }
 
-    const dataStr = JSON.stringify(myLibrary, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
+    const blob = new Blob(
+        [JSON.stringify(lists, null, 2)],
+        { type: "application/json" }
+    );
 
     const a = document.createElement("a");
-    a.href = url;
-    a.download = "vocablearn-library.json";
+    a.href = URL.createObjectURL(blob);
+    a.download = "vocablearn_lists.json";
     a.click();
-
-    URL.revokeObjectURL(url);
 }
+
 
 function importLibrary(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = e => {
-        try {
-            const imported = JSON.parse(e.target.result);
-
-            if (!Array.isArray(imported)) {
-                throw new Error("Formato inválido");
-            }
-
-            // Evitar duplicados por ID
-            const existingIds = new Set(myLibrary.map(i => i.id));
-            const clean = imported.filter(i => i.id && !existingIds.has(i.id));
-
-            myLibrary = [...myLibrary, ...clean];
-            localStorage.setItem('factory_library', JSON.stringify(myLibrary));
-
-            updateLibraryUI();
-            updateStats();
-            alert(`✅ ${clean.length} palabras importadas correctamente`);
-        } catch (err) {
-            alert("❌ Archivo inválido");
+    reader.onload = () => {
+        const imported = JSON.parse(reader.result);
+        if (!Array.isArray(imported)) {
+            alert("Archivo inválido");
+            return;
         }
-    };
 
+        const existing = new Set(lists.map(l => l.id));
+        const clean = imported.filter(l => l.id && !existing.has(l.id));
+
+        lists.push(...clean);
+        saveLists();
+        updateLibraryUI();
+        updateStats();
+
+        alert(`✅ ${clean.length} listas importadas`);
+    };
     reader.readAsText(file);
 }
+
 
 
 updateLibraryUI();
