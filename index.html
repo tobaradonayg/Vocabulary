@@ -158,255 +158,326 @@
 
 <!-- JS (MISMA LÓGICA, SIN CAMBIOS) -->
 <script>
- // --- Gemini Configuration ---
-    const apiKey = "AIzaSyA9IvlGyhI-PMZEOKItkR5US5kFHh3SPLY"; 
-    const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
+/* =========================
+   GEMINI CONFIG
+========================= */
+const apiKey = "AIzaSyA9IvlGyhI-PMZEOKItkR5US5kFHh3SPLY";
+const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
 
-    // --- State ---
-    let myLibrary = JSON.parse(localStorage.getItem('factory_library')) || [];
-    let currentTempList = [];
-    let studyIndex = 0;
+/* =========================
+   STATE (RETROCOMPATIBLE)
+========================= */
+let lists = JSON.parse(localStorage.getItem('factory_lists')) || [];
+let myLibrary = JSON.parse(localStorage.getItem('factory_library')) || []; // legacy
+let currentTempList = [];
+let studyIndex = 0;
 
-    async function callGemini(prompt, isJson = false) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
-        const payload = { contents: [{ parts: [{ text: prompt }] }] };
+/* =========================
+   MIGRACIÓN AUTOMÁTICA
+========================= */
+(function migrateOldLibrary() {
+    if (myLibrary.length && lists.length === 0) {
+        lists.push({
+            id: crypto.randomUUID(),
+            name: "Mi primera lista",
+            createdAt: Date.now(),
+            items: myLibrary
+        });
+        myLibrary = [];
+        localStorage.removeItem('factory_library');
+        localStorage.setItem('factory_lists', JSON.stringify(lists));
+    }
+})();
 
-        if (isJson) {
-            payload.generationConfig = {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: "OBJECT",
-                    properties: {
+/* =========================
+   HELPERS
+========================= */
+const today = () => new Date().toISOString().split("T")[0];
+const saveLists = () =>
+    localStorage.setItem('factory_lists', JSON.stringify(lists));
+
+const allItems = () => lists.flatMap(l => l.items);
+
+/* =========================
+   GEMINI CALL
+========================= */
+async function callGemini(prompt, isJson = false) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+
+    if (isJson) {
+        payload.generationConfig = {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: "OBJECT",
+                properties: {
+                    items: {
+                        type: "ARRAY",
                         items: {
-                            type: "ARRAY",
-                            items: {
-                                type: "OBJECT",
-                                properties: {
-                                    word: { type: "STRING" },
-                                    translation: { type: "STRING" },
-                                    example: { type: "STRING" },
-                                    type: { type: "STRING" }
-                                }
+                            type: "OBJECT",
+                            properties: {
+                                word: { type: "STRING" },
+                                translation: { type: "STRING" },
+                                example: { type: "STRING" },
+                                type: { type: "STRING" }
                             }
                         }
                     }
                 }
-            };
-        }
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await response.json();
-        const text = data.candidates[0].content.parts[0].text;
-        return isJson ? JSON.parse(text) : text;
+            }
+        };
     }
 
-    // --- Factory Logic ---
-    async function generateList() {
-        const topic = document.getElementById('ai-topic').value.trim();
-        const btn = document.getElementById('btn-generate');
-        if (!topic) return;
+    const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
 
-        btn.disabled = true;
-        btn.classList.add('loading-ai');
-        btn.textContent = "✨...";
+    const data = await response.json();
+    return JSON.parse(data.candidates[0].content.parts[0].text);
+}
 
-        try {
-            const prompt = `Actúa como un lingüista experto. Genera una lista de estudio intensivo sobre el tema: "${topic}".
-            Incluye 5 sustantivos clave, 5 verbos esenciales y 5 frases comunes.
-            Cada elemento debe tener: palabra en inglés, traducción al español y una frase de ejemplo en inglés.
-            Responde estrictamente en JSON.`;
+/* =========================
+   FACTORY
+========================= */
+async function generateList() {
+    const topic = document.getElementById('ai-topic').value.trim();
+    const btn = document.getElementById('btn-generate');
+    if (!topic) return;
 
-            const result = await callGemini(prompt, true);
-            currentTempList = result.items;
-            renderTempResults();
-        } catch (e) {
-            console.error(e);
-            alert("Error al conectar con la IA.");
-        } finally {
-            btn.disabled = false;
-            btn.classList.remove('loading-ai');
-            btn.textContent = "Crear ✨";
-        }
+    btn.disabled = true;
+    btn.classList.add('loading-ai');
+    btn.textContent = "✨...";
+
+    try {
+        const prompt = `
+        Actúa como un lingüista experto.
+        Tema: "${topic}"
+        Genera 5 sustantivos, 5 verbos y 5 frases.
+        Responde estrictamente en JSON.
+        `;
+
+        const result = await callGemini(prompt, true);
+        currentTempList = result.items;
+        renderTempResults();
+
+    } catch (e) {
+        alert("Error al conectar con Gemini");
+        console.error(e);
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading-ai');
+        btn.textContent = "Crear ✨";
     }
+}
 
-    function renderTempResults() {
-        const container = document.getElementById('result-items');
-        const box = document.getElementById('factory-result');
-        container.innerHTML = "";
-        box.classList.remove('hidden');
+function renderTempResults() {
+    const container = document.getElementById('result-items');
+    const box = document.getElementById('factory-result');
+    container.innerHTML = "";
+    box.classList.remove('hidden');
 
-        currentTempList.forEach(item => {
-            const badgeColor =
-                item.type === 'verb'
-                    ? 'bg-blue-100 text-blue-600'
-                    : item.type === 'phrase'
-                    ? 'bg-purple-100 text-purple-600'
-                    : 'bg-slate-100 text-slate-600';
+    currentTempList.forEach(item => {
+        container.innerHTML += `
+        <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm card-enter">
+            <p class="font-bold text-slate-800">
+                ${item.word}
+                <span class="text-indigo-500">→ ${item.translation}</span>
+            </p>
+            <p class="text-xs italic text-slate-400">${item.example}</p>
+        </div>`;
+    });
+}
 
-            container.innerHTML += `
-                <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm card-enter">
-                    <span class="text-xs font-bold uppercase ${badgeColor} px-2 py-0.5 rounded-full">
-                        ${item.type || 'word'}
-                    </span>
-                    <p class="font-bold text-slate-800 mt-1">
-                        ${item.word}
-                        <span class="text-indigo-500 font-normal">→ ${item.translation}</span>
-                    </p>
-                    <p class="text-[11px] text-slate-400 italic mt-1">
-                        ${item.example}
-                    </p>
-                </div>
-            `;
-        });
-    }
+/* =========================
+   SAVE AS LIST
+========================= */
+function saveCurrentList() {
+    if (!currentTempList.length) return;
 
-    function saveCurrentList() {
-        const newItems = currentTempList.map(item => ({
+    const name = prompt("Nombre de la lista:");
+    if (!name) return;
+
+    const list = {
+        id: crypto.randomUUID(),
+        name,
+        createdAt: Date.now(),
+        items: currentTempList.map(item => ({
             ...item,
             id: crypto.randomUUID(),
-            nextReview: new Date().toISOString().split('T')[0],
+            nextReview: today(),
             interval: 1,
             ease: 2.5
-        }));
+        }))
+    };
 
-        myLibrary = [...myLibrary, ...newItems];
-        localStorage.setItem('factory_library', JSON.stringify(myLibrary));
-        currentTempList = [];
-        document.getElementById('factory-result').classList.add('hidden');
-        document.getElementById('ai-topic').value = "";
-        updateLibraryUI();
-        alert("¡Lista guardada en tu biblioteca personal!");
+    lists.push(list);
+    saveLists();
+
+    currentTempList = [];
+    document.getElementById('factory-result').classList.add('hidden');
+    document.getElementById('ai-topic').value = "";
+    updateLibraryUI();
+
+    alert("Lista guardada ✅");
+}
+
+/* =========================
+   LIBRARY UI
+========================= */
+function updateLibraryUI() {
+    const container = document.getElementById('library-list');
+    const count = document.getElementById('lib-count');
+
+    count.textContent = `${lists.length} LISTAS`;
+    container.innerHTML = "";
+
+    if (!lists.length) {
+        container.innerHTML = `
+        <p class="text-center text-slate-300 py-10 italic">
+            No tienes listas todavía
+        </p>`;
+        return;
     }
 
-    // --- Library Logic ---
-    function updateLibraryUI() {
-        const container = document.getElementById('library-list');
-        const count = document.getElementById('lib-count');
-        count.textContent = `${myLibrary.length} ELEMENTOS`;
-        container.innerHTML = "";
+    lists.forEach(list => {
+        container.innerHTML += `
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+            <p class="font-bold">${list.name}</p>
+            <p class="text-[10px] text-slate-400">${list.items.length} palabras</p>
+        </div>`;
+    });
+}
 
-        if (myLibrary.length === 0) {
-            container.innerHTML = `
-                <p class="text-center text-slate-300 py-10 text-sm italic">
-                    Tu biblioteca está vacía.<br>
-                    ¡Genera una lista en la Factory!
-                </p>`;
-            return;
-        }
+/* =========================
+   STUDY (TODAS LAS LISTAS)
+========================= */
+function loadStudyCard() {
+    const due = allItems().filter(i => i.nextReview <= today());
+    const content = document.getElementById('card-content');
 
-        myLibrary.slice(-20).reverse().forEach(item => {
-            container.innerHTML += `
-                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <div>
-                        <p class="font-bold text-sm">${item.word}</p>
-                        <p class="text-[10px] text-slate-400">${item.translation}</p>
-                    </div>
-                    <button onclick="deleteItem('${item.id}')" class="text-slate-300 hover:text-rose-500">
-                        ✕
-                    </button>
-                </div>
-            `;
-        });
+    if (!due.length) {
+        content.innerHTML = `
+        <div class="text-center">
+            <span class="text-5xl">✅</span>
+            <h2 class="text-2xl font-bold mt-4">¡Todo repasado!</h2>
+            <p class="text-slate-400 text-sm">Nada pendiente hoy</p>
+        </div>`;
+        return;
     }
 
-    function deleteItem(id) {
-        myLibrary = myLibrary.filter(i => i.id !== id);
-        localStorage.setItem('factory_library', JSON.stringify(myLibrary));
-        updateLibraryUI();
-        updateStats();
+    studyIndex = 0;
+    window.studyQueue = due;
+    showStudyCard();
+}
+
+function showStudyCard() {
+    const w = window.studyQueue[studyIndex];
+    document.getElementById('word').textContent = w.word;
+    document.getElementById('translation').textContent = w.translation;
+    document.getElementById('example').textContent = `"${w.example}"`;
+}
+
+function rateWord(level) {
+    const w = window.studyQueue[studyIndex];
+    const now = new Date();
+
+    if (level === 'hard') {
+        w.interval = 1;
+        w.ease = Math.max(1.3, w.ease - 0.2);
+    } else if (level === 'medium') {
+        w.interval = Math.round(w.interval * w.ease);
+    } else {
+        w.interval = Math.round(w.interval * w.ease * 1.5);
+        w.ease += 0.1;
     }
 
-    // --- Study Logic ---
-    function loadStudyCard() {
-        const today = new Date().toISOString().split('T')[0];
-        const due = myLibrary.filter(i => i.nextReview <= today);
-        const content = document.getElementById('card-content');
+    const next = new Date(now);
+    next.setDate(now.getDate() + w.interval);
+    w.nextReview = next.toISOString().split('T')[0];
 
-        if (due.length === 0) {
-            content.innerHTML = `
-                <div class="text-center">
-                    <span class="text-5xl">✅</span>
-                    <h2 class="text-2xl font-bold mt-4">¡Todo repasado!</h2>
-                    <p class="text-slate-400 text-sm">No tienes pendientes para hoy.</p>
-                </div>`;
-            return;
-        }
+    saveLists();
+    studyIndex++;
 
-        const active = due[0];
-        studyIndex = myLibrary.findIndex(i => i.id === active.id);
+    if (studyIndex < window.studyQueue.length) showStudyCard();
+    else loadStudyCard();
+}
 
-        document.getElementById('word').textContent = active.word;
-        document.getElementById('translation').textContent = active.translation;
-        document.getElementById('example').textContent = `"${active.example}"`;
+/* =========================
+   EXPORT / IMPORT
+========================= */
+function downloadLists() {
+    const blob = new Blob(
+        [JSON.stringify(lists, null, 2)],
+        { type: "application/json" }
+    );
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "vocablearn_lists.json";
+    a.click();
+}
+
+function uploadLists() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+
+    input.onchange = e => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = () => {
+            const data = JSON.parse(reader.result);
+            lists = [...lists, ...data];
+            saveLists();
+            updateLibraryUI();
+            alert("Listas importadas ✅");
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+
+/* =========================
+   UTILITIES
+========================= */
+function showTab(tabId) {
+    ['factory','library','learn','settings'].forEach(t => {
+        document.getElementById(`section-${t}`).classList.add('hidden');
+        document.getElementById(`tab-${t}`).classList.remove('active-tab');
+    });
+    document.getElementById(`section-${tabId}`).classList.remove('hidden');
+    document.getElementById(`tab-${tabId}`).classList.add('active-tab');
+
+    if (tabId === 'library') updateLibraryUI();
+    if (tabId === 'learn') loadStudyCard();
+}
+
+function speakCurrent() {
+    const text = document.getElementById('word').textContent;
+    if (!text || text === '...') return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US';
+    speechSynthesis.speak(u);
+}
+
+function updateStats() {
+    const due = allItems().filter(i => i.nextReview <= today()).length;
+    document.getElementById('stats').textContent =
+        `${allItems().length} EN TOTAL | ${due} PARA REPASAR HOY`;
+}
+
+function clearData() {
+    if (confirm("¿Borrar todo?")) {
+        localStorage.clear();
+        location.reload();
     }
+}
 
-    function rateWord(level) {
-        if (!myLibrary[studyIndex]) return;
-        const w = myLibrary[studyIndex];
-        const now = new Date();
-
-        if (level === 'hard') {
-            w.interval = 1;
-            w.ease = Math.max(1.3, w.ease - 0.2);
-        } else if (level === 'medium') {
-            w.interval = Math.round(w.interval * w.ease);
-        } else {
-            w.interval = Math.round(w.interval * w.ease * 1.5);
-            w.ease += 0.1;
-        }
-
-        const next = new Date(now);
-        next.setDate(now.getDate() + w.interval);
-        w.nextReview = next.toISOString().split('T')[0];
-
-        localStorage.setItem('factory_library', JSON.stringify(myLibrary));
-        loadStudyCard();
-        updateStats();
-    }
-
-    // --- Utilities ---
-    function showTab(tabId) {
-        ['factory', 'library', 'learn', 'settings'].forEach(t => {
-            document.getElementById(`section-${t}`).classList.add('hidden');
-            document.getElementById(`tab-${t}`).classList.remove('active-tab');
-        });
-
-        document.getElementById(`section-${tabId}`).classList.remove('hidden');
-        document.getElementById(`tab-${tabId}`).classList.add('active-tab');
-
-        if (tabId === 'library') updateLibraryUI();
-        if (tabId === 'learn') loadStudyCard();
-    }
-
-    function speakCurrent() {
-        const text = document.getElementById('word').textContent;
-        if (!text || text === '...') return;
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'en-US';
-        window.speechSynthesis.speak(u);
-    }
-
-    function updateStats() {
-        const today = new Date().toISOString().split('T')[0];
-        const due = myLibrary.filter(i => i.nextReview <= today).length;
-        document.getElementById('stats').textContent =
-            `${myLibrary.length} EN TOTAL | ${due} PARA REPASAR HOY`;
-    }
-
-    function clearData() {
-        if (confirm("¿Borrar toda tu biblioteca?")) {
-            localStorage.clear();
-            location.reload();
-        }
-    }
-
-    updateStats();
+updateLibraryUI();
+updateStats();
 </script>
+
 
 </body>
 </html>
