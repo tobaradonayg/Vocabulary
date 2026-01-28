@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VocabLearn AI Factory</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        .active-tab {
+            border-bottom: 2px solid #4f46e5;
+            color: #4f46e5;
+            font-weight: bold;
+        }
+        .hidden { display: none; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes pulse-ai {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .loading-ai { animation: pulse-ai 1.5s infinite; }
+
+        .card-enter {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900 min-h-screen flex items-center justify-center p-2 sm:p-4 pb-[env(safe-area-inset-bottom)]">
+
+<div class="w-full max-w-lg bg-white sm:rounded-3xl shadow-xl overflow-hidden border border-slate-100 flex flex-col h-screen sm:h-[90vh] sm:max-h-[800px]">
+
+    <!-- HEADER -->
+    <header class="text-center px-4 py-4 sm:p-6 pb-2 shrink-0">
+        <h1 class="text-2xl sm:text-3xl font-black tracking-tighter text-slate-800">
+            VocabLearn <span class="text-indigo-600 font-serif italic">Factory</span>
+        </h1>
+        <p class="text-[10px] text-slate-400 uppercase tracking-widest mt-1 font-bold">
+            Generador de Contenido Inteligente
+        </p>
+    </header>
+
+    <!-- NAV TABS -->
+    <nav class="flex px-2 sm:px-4 border-b border-slate-100 overflow-x-auto whitespace-nowrap scrollbar-hide shrink-0 bg-white sticky top-0 z-10">
+        <button onclick="showTab('factory')" id="tab-factory" class="px-4 py-3 text-sm min-w-[90px] active-tab">✨ Generar</button>
+        <button onclick="showTab('library')" id="tab-library" class="px-4 py-3 text-sm min-w-[90px]">📚 Biblioteca</button>
+        <button onclick="showTab('learn')" id="tab-learn" class="px-4 py-3 text-sm min-w-[90px]">🧠 Repasar</button>
+        <button onclick="showTab('settings')" id="tab-settings" class="px-4 py-3 text-sm min-w-[60px]">⚙️</button>
+    </nav>
+
+    <!-- CONTENT -->
+    <div class="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-hide">
+
+        <!-- FACTORY -->
+        <div id="section-factory" class="space-y-6">
+            <div class="bg-indigo-600 rounded-2xl p-5 text-white shadow-lg shadow-indigo-200">
+                <h3 class="font-bold text-lg mb-2">¿Qué quieres aprender hoy?</h3>
+                <p class="text-indigo-100 text-xs mb-4">
+                    La IA creará vocabulario, verbos y frases reales.
+                </p>
+
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input id="ai-topic" type="text"
+                        placeholder="Ej: Viaje, Cocina, Negocios..."
+                        class="flex-1 p-3 rounded-xl text-slate-900 text-sm outline-none focus:ring-2 focus:ring-indigo-300" />
+
+                    <button onclick="generateList()" id="btn-generate"
+                        class="bg-white text-indigo-600 px-4 py-3 rounded-xl font-bold text-sm hover:bg-indigo-50 transition w-full sm:w-auto">
+                        Crear ✨
+                    </button>
+                </div>
+            </div>
+
+            <div id="factory-result" class="hidden space-y-4">
+                <div class="flex justify-between items-center">
+                    <h4 class="font-bold text-slate-700">Resultados</h4>
+                    <button onclick="saveCurrentList()"
+                        class="text-xs bg-emerald-500 text-white px-3 py-1 rounded-full font-bold hover:bg-emerald-600">
+                        Guardar Todo
+                    </button>
+                </div>
+
+                <div id="result-items" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- LIBRARY -->
+        <div id="section-library" class="hidden space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-slate-800 italic">Tus Listas</h3>
+                <span id="lib-count" class="text-[10px] bg-slate-100 px-2 py-1 rounded-full font-bold">0</span>
+            </div>
+
+            <div id="library-list" class="space-y-2"></div>
+        </div>
+
+        <!-- LEARN -->
+        <div id="section-learn" class="hidden space-y-6">
+            <div id="card-content" class="text-center space-y-3 min-h-[300px] flex flex-col justify-center">
+                <h2 id="word" class="text-4xl sm:text-5xl font-bold text-slate-800 tracking-tight">...</h2>
+                <p id="translation" class="text-lg sm:text-xl text-indigo-500 font-medium">
+                    Pulsa repasar para empezar
+                </p>
+
+                <div class="bg-slate-50 rounded-2xl p-4 mt-4 border border-slate-100">
+                    <p id="example" class="text-sm sm:text-md text-slate-700 leading-relaxed italic">"..."</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3">
+                <button onclick="rateWord('hard')"
+                    class="bg-rose-50 text-rose-600 py-4 rounded-2xl font-bold text-sm active:scale-95 transition">
+                    Difícil
+                </button>
+                <button onclick="rateWord('medium')"
+                    class="bg-amber-50 text-amber-600 py-4 rounded-2xl font-bold text-sm active:scale-95 transition">
+                    Bien
+                </button>
+                <button onclick="rateWord('easy')"
+                    class="bg-emerald-50 text-emerald-600 py-4 rounded-2xl font-bold text-sm active:scale-95 transition">
+                    Fácil
+                </button>
+            </div>
+
+            <button onclick="speakCurrent()"
+                class="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold">
+                🔊 Escuchar pronunciación
+            </button>
+        </div>
+
+        <!-- SETTINGS -->
+        <div id="section-settings" class="hidden space-y-4 text-center">
+            <button onclick="clearData()"
+                class="text-rose-500 text-sm font-bold border border-rose-100 px-6 py-3 rounded-2xl hover:bg-rose-50 transition">
+                Borrar todos los datos
+            </button>
+            <p class="text-[10px] text-slate-400 uppercase">
+                Desarrollado con Gemini 2.5 Flash
+            </p>
+        </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="p-3 sm:p-4 bg-slate-50 border-t border-slate-100 text-center shrink-0">
+        <p id="stats" class="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+            LISTO PARA APRENDER
+        </p>
+    </footer>
+
+</div>
+
+<!-- JS (MISMA LÓGICA, SIN CAMBIOS) -->
+<script>
+ // --- Gemini Configuration ---
+    const apiKey = ""; 
+    const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
+
+    // --- State ---
+    let myLibrary = JSON.parse(localStorage.getItem('factory_library')) || [];
+    let currentTempList = [];
+    let studyIndex = 0;
+
+    async function callGemini(prompt, isJson = false) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+        const payload = { contents: [{ parts: [{ text: prompt }] }] };
+
+        if (isJson) {
+            payload.generationConfig = {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: "OBJECT",
+                    properties: {
+                        items: {
+                            type: "ARRAY",
+                            items: {
+                                type: "OBJECT",
+                                properties: {
+                                    word: { type: "STRING" },
+                                    translation: { type: "STRING" },
+                                    example: { type: "STRING" },
+                                    type: { type: "STRING" }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        const text = data.candidates[0].content.parts[0].text;
+        return isJson ? JSON.parse(text) : text;
+    }
+
+    // --- Factory Logic ---
+    async function generateList() {
+        const topic = document.getElementById('ai-topic').value.trim();
+        const btn = document.getElementById('btn-generate');
+        if (!topic) return;
+
+        btn.disabled = true;
+        btn.classList.add('loading-ai');
+        btn.textContent = "✨...";
+
+        try {
+            const prompt = `Actúa como un lingüista experto. Genera una lista de estudio intensivo sobre el tema: "${topic}".
+            Incluye 5 sustantivos clave, 5 verbos esenciales y 5 frases comunes.
+            Cada elemento debe tener: palabra en inglés, traducción al español y una frase de ejemplo en inglés.
+            Responde estrictamente en JSON.`;
+
+            const result = await callGemini(prompt, true);
+            currentTempList = result.items;
+            renderTempResults();
+        } catch (e) {
+            console.error(e);
+            alert("Error al conectar con la IA.");
+        } finally {
+            btn.disabled = false;
+            btn.classList.remove('loading-ai');
+            btn.textContent = "Crear ✨";
+        }
+    }
+
+    function renderTempResults() {
+        const container = document.getElementById('result-items');
+        const box = document.getElementById('factory-result');
+        container.innerHTML = "";
+        box.classList.remove('hidden');
+
+        currentTempList.forEach(item => {
+            const badgeColor =
+                item.type === 'verb'
+                    ? 'bg-blue-100 text-blue-600'
+                    : item.type === 'phrase'
+                    ? 'bg-purple-100 text-purple-600'
+                    : 'bg-slate-100 text-slate-600';
+
+            container.innerHTML += `
+                <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm card-enter">
+                    <span class="text-xs font-bold uppercase ${badgeColor} px-2 py-0.5 rounded-full">
+                        ${item.type || 'word'}
+                    </span>
+                    <p class="font-bold text-slate-800 mt-1">
+                        ${item.word}
+                        <span class="text-indigo-500 font-normal">→ ${item.translation}</span>
+                    </p>
+                    <p class="text-[11px] text-slate-400 italic mt-1">
+                        ${item.example}
+                    </p>
+                </div>
+            `;
+        });
+    }
+
+    function saveCurrentList() {
+        const newItems = currentTempList.map(item => ({
+            ...item,
+            id: crypto.randomUUID(),
+            nextReview: new Date().toISOString().split('T')[0],
+            interval: 1,
+            ease: 2.5
+        }));
+
+        myLibrary = [...myLibrary, ...newItems];
+        localStorage.setItem('factory_library', JSON.stringify(myLibrary));
+        currentTempList = [];
+        document.getElementById('factory-result').classList.add('hidden');
+        document.getElementById('ai-topic').value = "";
+        updateLibraryUI();
+        alert("¡Lista guardada en tu biblioteca personal!");
+    }
+
+    // --- Library Logic ---
+    function updateLibraryUI() {
+        const container = document.getElementById('library-list');
+        const count = document.getElementById('lib-count');
+        count.textContent = `${myLibrary.length} ELEMENTOS`;
+        container.innerHTML = "";
+
+        if (myLibrary.length === 0) {
+            container.innerHTML = `
+                <p class="text-center text-slate-300 py-10 text-sm italic">
+                    Tu biblioteca está vacía.<br>
+                    ¡Genera una lista en la Factory!
+                </p>`;
+            return;
+        }
+
+        myLibrary.slice(-20).reverse().forEach(item => {
+            container.innerHTML += `
+                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div>
+                        <p class="font-bold text-sm">${item.word}</p>
+                        <p class="text-[10px] text-slate-400">${item.translation}</p>
+                    </div>
+                    <button onclick="deleteItem('${item.id}')" class="text-slate-300 hover:text-rose-500">
+                        ✕
+                    </button>
+                </div>
+            `;
+        });
+    }
+
+    function deleteItem(id) {
+        myLibrary = myLibrary.filter(i => i.id !== id);
+        localStorage.setItem('factory_library', JSON.stringify(myLibrary));
+        updateLibraryUI();
+        updateStats();
+    }
+
+    // --- Study Logic ---
+    function loadStudyCard() {
+        const today = new Date().toISOString().split('T')[0];
+        const due = myLibrary.filter(i => i.nextReview <= today);
+        const content = document.getElementById('card-content');
+
+        if (due.length === 0) {
+            content.innerHTML = `
+                <div class="text-center">
+                    <span class="text-5xl">✅</span>
+                    <h2 class="text-2xl font-bold mt-4">¡Todo repasado!</h2>
+                    <p class="text-slate-400 text-sm">No tienes pendientes para hoy.</p>
+                </div>`;
+            return;
+        }
+
+        const active = due[0];
+        studyIndex = myLibrary.findIndex(i => i.id === active.id);
+
+        document.getElementById('word').textContent = active.word;
+        document.getElementById('translation').textContent = active.translation;
+        document.getElementById('example').textContent = `"${active.example}"`;
+    }
+
+    function rateWord(level) {
+        if (!myLibrary[studyIndex]) return;
+        const w = myLibrary[studyIndex];
+        const now = new Date();
+
+        if (level === 'hard') {
+            w.interval = 1;
+            w.ease = Math.max(1.3, w.ease - 0.2);
+        } else if (level === 'medium') {
+            w.interval = Math.round(w.interval * w.ease);
+        } else {
+            w.interval = Math.round(w.interval * w.ease * 1.5);
+            w.ease += 0.1;
+        }
+
+        const next = new Date(now);
+        next.setDate(now.getDate() + w.interval);
+        w.nextReview = next.toISOString().split('T')[0];
+
+        localStorage.setItem('factory_library', JSON.stringify(myLibrary));
+        loadStudyCard();
+        updateStats();
+    }
+
+    // --- Utilities ---
+    function showTab(tabId) {
+        ['factory', 'library', 'learn', 'settings'].forEach(t => {
+            document.getElementById(`section-${t}`).classList.add('hidden');
+            document.getElementById(`tab-${t}`).classList.remove('active-tab');
+        });
+
+        document.getElementById(`section-${tabId}`).classList.remove('hidden');
+        document.getElementById(`tab-${tabId}`).classList.add('active-tab');
+
+        if (tabId === 'library') updateLibraryUI();
+        if (tabId === 'learn') loadStudyCard();
+    }
+
+    function speakCurrent() {
+        const text = document.getElementById('word').textContent;
+        if (!text || text === '...') return;
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'en-US';
+        window.speechSynthesis.speak(u);
+    }
+
+    function updateStats() {
+        const today = new Date().toISOString().split('T')[0];
+        const due = myLibrary.filter(i => i.nextReview <= today).length;
+        document.getElementById('stats').textContent =
+            `${myLibrary.length} EN TOTAL | ${due} PARA REPASAR HOY`;
+    }
+
+    function clearData() {
+        if (confirm("¿Borrar toda tu biblioteca?")) {
+            localStorage.clear();
+            location.reload();
+        }
+    }
+
+    updateStats();
+</script>
+
+</body>
+</html>
