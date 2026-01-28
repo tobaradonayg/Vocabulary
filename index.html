@@ -2,31 +2,32 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Vocab Pro</title>
-
-    <!-- Tailwind CDN -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VocabLearn AI Factory</title>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
         .active-tab {
-            border-bottom: 2px solid #6366f1;
-            color: #6366f1;
+            border-bottom: 2px solid #4f46e5;
+            color: #4f46e5;
             font-weight: bold;
         }
-        .card-enter {
-            animation: fadeUp 0.3s ease-out;
-        }
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(6px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .loading-ai {
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
+        .hidden { display: none; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes pulse-ai {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
+        }
+        .loading-ai { animation: pulse-ai 1.5s infinite; }
+
+        .card-enter {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
     </style>
 </head>
@@ -38,94 +39,118 @@
     <!-- HEADER -->
     <header class="text-center px-4 py-4 sm:p-6 pb-2 shrink-0">
         <h1 class="text-2xl sm:text-3xl font-black tracking-tighter text-slate-800">
-            Vocab<span class="text-indigo-500">Pro</span>
+            VocabLearn <span class="text-indigo-600 font-serif italic">Factory</span>
         </h1>
-        <p class="text-xs text-slate-400 font-medium">Aprende vocabulario inteligente</p>
+        <p class="text-[10px] text-slate-400 uppercase tracking-widest mt-1 font-bold">
+            Generador de Contenido Inteligente
+        </p>
     </header>
 
-    <!-- NAV -->
-    <nav class="flex px-2 sm:px-4 border-b border-slate-100 overflow-x-auto whitespace-nowrap shrink-0 bg-white sticky top-0 z-10">
-        <button id="tab-factory" onclick="showTab('factory')" class="px-4 py-3 min-w-[90px] active-tab">Factory</button>
-        <button id="tab-library" onclick="showTab('library')" class="px-4 py-3 min-w-[90px]">Biblioteca</button>
-        <button id="tab-learn" onclick="showTab('learn')" class="px-4 py-3 min-w-[90px]">Repasar</button>
-        <button id="tab-settings" onclick="showTab('settings')" class="px-4 py-3 min-w-[90px]">Ajustes</button>
+    <!-- NAV TABS -->
+    <nav class="flex px-2 sm:px-4 border-b border-slate-100 overflow-x-auto whitespace-nowrap scrollbar-hide shrink-0 bg-white sticky top-0 z-10">
+        <button onclick="showTab('factory')" id="tab-factory" class="px-4 py-3 text-sm min-w-[90px] active-tab">✨ Generar</button>
+        <button onclick="showTab('library')" id="tab-library" class="px-4 py-3 text-sm min-w-[90px]">📚 Biblioteca</button>
+        <button onclick="showTab('learn')" id="tab-learn" class="px-4 py-3 text-sm min-w-[90px]">🧠 Repasar</button>
+        <button onclick="showTab('settings')" id="tab-settings" class="px-4 py-3 text-sm min-w-[60px]">⚙️</button>
     </nav>
 
     <!-- CONTENT -->
-    <main class="flex-1 overflow-y-auto p-4 space-y-4">
+    <div class="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-hide">
 
         <!-- FACTORY -->
-        <section id="section-factory">
-            <input id="ai-topic" type="text"
-                placeholder="Ej: Trabajo, Viajes, Tecnología..."
-                class="w-full p-3 rounded-xl border border-slate-200 mb-3 text-sm"/>
+        <div id="section-factory" class="space-y-6">
+            <div class="bg-indigo-600 rounded-2xl p-5 text-white shadow-lg shadow-indigo-200">
+                <h3 class="font-bold text-lg mb-2">¿Qué quieres aprender hoy?</h3>
+                <p class="text-indigo-100 text-xs mb-4">
+                    La IA creará vocabulario, verbos y frases reales.
+                </p>
 
-            <div class="flex flex-col sm:flex-row gap-2">
-                <button id="btn-generate" onclick="generateList()"
-                    class="bg-indigo-500 text-white px-4 py-3 rounded-xl font-bold text-sm hover:bg-indigo-600 transition w-full sm:w-auto">
-                    Crear ✨
-                </button>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input id="ai-topic" type="text"
+                        placeholder="Ej: Viaje, Cocina, Negocios..."
+                        class="flex-1 p-3 rounded-xl text-slate-900 text-sm outline-none focus:ring-2 focus:ring-indigo-300" />
+
+                    <button onclick="generateList()" id="btn-generate"
+                        class="bg-white text-indigo-600 px-4 py-3 rounded-xl font-bold text-sm hover:bg-indigo-50 transition w-full sm:w-auto">
+                        Crear ✨
+                    </button>
+                </div>
             </div>
 
-            <div id="factory-result" class="hidden mt-4 space-y-3">
-                <div id="result-items" class="grid gap-3"></div>
+            <div id="factory-result" class="hidden space-y-4">
+                <div class="flex justify-between items-center">
+                    <h4 class="font-bold text-slate-700">Resultados</h4>
+                    <button onclick="saveCurrentList()"
+                        class="text-xs bg-emerald-500 text-white px-3 py-1 rounded-full font-bold hover:bg-emerald-600">
+                        Guardar Todo
+                    </button>
+                </div>
 
-                <button onclick="saveCurrentList()"
-                    class="w-full bg-emerald-500 text-white py-3 rounded-xl font-bold mt-3">
-                    Guardar en mi biblioteca 💾
-                </button>
+                <div id="result-items" class="space-y-3"></div>
             </div>
-        </section>
+        </div>
 
         <!-- LIBRARY -->
-        <section id="section-library" class="hidden space-y-3">
-            <div class="flex justify-between text-xs font-bold text-slate-400">
-                <span>MI BIBLIOTECA</span>
-                <span id="lib-count">0</span>
+        <div id="section-library" class="hidden space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-slate-800 italic">Tus Listas</h3>
+                <span id="lib-count" class="text-[10px] bg-slate-100 px-2 py-1 rounded-full font-bold">0</span>
             </div>
+
             <div id="library-list" class="space-y-2"></div>
-        </section>
+        </div>
 
         <!-- LEARN -->
-        <section id="section-learn" class="hidden space-y-6 text-center">
-            <div id="card-content">
-                <h2 id="word" class="text-4xl sm:text-5xl font-bold">...</h2>
-                <p id="translation" class="text-lg sm:text-xl text-indigo-500 font-medium"></p>
-                <p id="example" class="text-sm sm:text-md text-slate-700 italic mt-2"></p>
+        <div id="section-learn" class="hidden space-y-6">
+            <div id="card-content" class="text-center space-y-3 min-h-[300px] flex flex-col justify-center">
+                <h2 id="word" class="text-4xl sm:text-5xl font-bold text-slate-800 tracking-tight">...</h2>
+                <p id="translation" class="text-lg sm:text-xl text-indigo-500 font-medium">
+                    Pulsa repasar para empezar
+                </p>
+
+                <div class="bg-slate-50 rounded-2xl p-4 mt-4 border border-slate-100">
+                    <p id="example" class="text-sm sm:text-md text-slate-700 leading-relaxed italic">"..."</p>
+                </div>
             </div>
 
-            <button onclick="speakCurrent()" class="text-indigo-500 font-bold text-sm">
-                🔊 Pronunciar
-            </button>
-
             <div class="grid grid-cols-3 gap-3">
-                <button onclick="rateWord('hard')" class="py-4 rounded-2xl bg-rose-100 text-rose-600 font-bold active:scale-95">
+                <button onclick="rateWord('hard')"
+                    class="bg-rose-50 text-rose-600 py-4 rounded-2xl font-bold text-sm active:scale-95 transition">
                     Difícil
                 </button>
-                <button onclick="rateWord('medium')" class="py-4 rounded-2xl bg-yellow-100 text-yellow-600 font-bold active:scale-95">
+                <button onclick="rateWord('medium')"
+                    class="bg-amber-50 text-amber-600 py-4 rounded-2xl font-bold text-sm active:scale-95 transition">
                     Bien
                 </button>
-                <button onclick="rateWord('easy')" class="py-4 rounded-2xl bg-emerald-100 text-emerald-600 font-bold active:scale-95">
+                <button onclick="rateWord('easy')"
+                    class="bg-emerald-50 text-emerald-600 py-4 rounded-2xl font-bold text-sm active:scale-95 transition">
                     Fácil
                 </button>
             </div>
-        </section>
+
+            <button onclick="speakCurrent()"
+                class="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold">
+                🔊 Escuchar pronunciación
+            </button>
+        </div>
 
         <!-- SETTINGS -->
-        <section id="section-settings" class="hidden space-y-4 text-sm">
-            <p id="stats" class="font-bold text-slate-500"></p>
-
-            <button onclick="clearData()" class="w-full bg-rose-500 text-white py-3 rounded-xl font-bold">
-                Borrar toda la biblioteca
+        <div id="section-settings" class="hidden space-y-4 text-center">
+            <button onclick="clearData()"
+                class="text-rose-500 text-sm font-bold border border-rose-100 px-6 py-3 rounded-2xl hover:bg-rose-50 transition">
+                Borrar todos los datos
             </button>
-        </section>
+            <p class="text-[10px] text-slate-400 uppercase">
+                Desarrollado con Gemini 2.5 Flash
+            </p>
+        </div>
 
-    </main>
+    </div>
 
     <!-- FOOTER -->
     <footer class="p-3 sm:p-4 bg-slate-50 border-t border-slate-100 text-center shrink-0">
-        <p class="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-            Vocab Pro · Offline Ready
+        <p id="stats" class="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+            LISTO PARA APRENDER
         </p>
     </footer>
 
