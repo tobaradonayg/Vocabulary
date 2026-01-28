@@ -134,16 +134,34 @@
             </button>
         </div>
 
-        <!-- SETTINGS -->
-        <div id="section-settings" class="hidden space-y-4 text-center">
-            <button onclick="clearData()"
-                class="text-rose-500 text-sm font-bold border border-rose-100 px-6 py-3 rounded-2xl hover:bg-rose-50 transition">
-                Borrar todos los datos
-            </button>
-            <p class="text-[10px] text-slate-400 uppercase">
-                Desarrollado con Gemini 2.5 Flash
-            </p>
-        </div>
+<!-- SETTINGS -->
+<div id="section-settings" class="hidden space-y-4 text-center">
+
+    <!-- EXPORT -->
+    <button onclick="exportLibrary()"
+        class="w-full bg-indigo-500 text-white py-3 rounded-2xl font-bold hover:bg-indigo-600 transition">
+        📥 Descargar mis listas
+    </button>
+
+    <!-- IMPORT -->
+    <label class="w-full flex items-center justify-center gap-2 bg-slate-100 py-3 rounded-2xl font-bold cursor-pointer hover:bg-slate-200 transition">
+        📤 Cargar listas
+        <input id="import-file" type="file" accept=".json" class="hidden" onchange="importLibrary(event)">
+    </label>
+
+    <hr class="border-slate-200 my-2">
+
+    <!-- DELETE -->
+    <button onclick="clearData()"
+        class="text-rose-500 text-sm font-bold border border-rose-100 px-6 py-3 rounded-2xl hover:bg-rose-50 transition">
+        Borrar todos los datos
+    </button>
+
+    <p class="text-[10px] text-slate-400 uppercase">
+        Desarrollado con Gemini 2.5 Flash
+    </p>
+</div>
+
 
     </div>
 
@@ -473,6 +491,57 @@ function clearData() {
         location.reload();
     }
 }
+    // --- Export / Import Library ---
+
+function exportLibrary() {
+    if (myLibrary.length === 0) {
+        alert("No tienes listas para descargar.");
+        return;
+    }
+
+    const dataStr = JSON.stringify(myLibrary, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "vocablearn-library.json";
+    a.click();
+
+    URL.revokeObjectURL(url);
+}
+
+function importLibrary(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const imported = JSON.parse(e.target.result);
+
+            if (!Array.isArray(imported)) {
+                throw new Error("Formato inválido");
+            }
+
+            // Evitar duplicados por ID
+            const existingIds = new Set(myLibrary.map(i => i.id));
+            const clean = imported.filter(i => i.id && !existingIds.has(i.id));
+
+            myLibrary = [...myLibrary, ...clean];
+            localStorage.setItem('factory_library', JSON.stringify(myLibrary));
+
+            updateLibraryUI();
+            updateStats();
+            alert(`✅ ${clean.length} palabras importadas correctamente`);
+        } catch (err) {
+            alert("❌ Archivo inválido");
+        }
+    };
+
+    reader.readAsText(file);
+}
+
 
 updateLibraryUI();
 updateStats();
